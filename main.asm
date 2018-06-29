@@ -147,20 +147,21 @@ loadPalette:
 
 
 swapVram:
-	ld hl,mpLcdRis
-svWaitVsync:
-	bit	bLcdIntLNBU,(hl)
-	 jr	z,svWaitVsync
-	ld hl,mpLcdIcr			; hl = mpLcdIcr
-	ld (hl),a				; clear interrupts
-	ld l,mpLcdBase & $ff	; hl = mpLcdBase, UH already holds correct value
+	ld hl,mpLcdBase			; hl = mpLcdBase, the address of the memory-mapped vRam
 	ld bc,(hl)				; get current vRam address
-	and a,b					; check if it is vRam or the offset
+	xor a,a
+	or a,b					; check if it is vRam (in which case b=0) or the second buffer
 	ld de,vRam
 	 jr nz,$ + 6
 		ld de,vRam + LCD_SIZE
-	ld (hl),de
-	ld (gBuf),bc
+	ld (hl),de				; swap buffer into mpLcdBase
+	ld (gBuf),bc			; save the inactive buffer as our new gbuf
+	ld	l,mpLcdIcr & $FF
+	set	bLcdIntLNBU,(hl)	; clear the previous LcdNextBaseUpdate interrupt
+	ld	l,mpLcdRis & $FF
+loop:
+	bit	bLcdIntLNBU,(hl)	; wait until the interrupt triggers
+	 jr z,loop
 	ret
 
 #include "gfx.asm"
